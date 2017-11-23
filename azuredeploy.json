@@ -1,0 +1,119 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "sourceCodeRepositoryURL": {
+      "type": "string",
+      "defaultValue": "https://github.com/ebashmakov/AzureApplicationInsightsNodesIssue.git"
+    },
+    "sourceCodeBranch": {
+      "type": "string",
+      "defaultValue": "master"
+    }
+  },
+  "variables": {
+    "location": "[resourceGroup().location]",
+    "functionAppName": "[toLower(concat(resourceGroup().name, '-functions'))]",
+    "hostingPlanName": "[variables('functionAppName')]",
+    "hostingPlanId": "[resourceId('Microsoft.Web/serverfarms', variables('hostingPlanName'))]",
+    "storageAccountName": "[uniqueString(resourceGroup().id)]",
+    "storageAccountId": "[concat(resourceGroup().id,'/providers/','Microsoft.Storage/storageAccounts/', variables('storageAccountName'))]",
+    "appInsightsName": "[resourceGroup().name]",
+    "appInsightsId": "[resourceId('Microsoft.Insights/components', variables('appInsightsName'))]"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Insights/components",
+      "kind": "General",
+      "name": "[variables('appInsightsName')]",
+      "apiVersion": "2014-04-01",
+      "location": "[variables('location')]",
+      "properties": {
+        "ApplicationId": "[variables('appInsightsName')]"
+      }
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts",
+      "name": "[variables('storageAccountName')]",
+      "apiVersion": "2015-06-15",
+      "location": "[variables('location')]",
+      "properties": {
+        "accountType": "Standard_LRS"
+      }
+    },
+    {
+      "type": "Microsoft.Web/serverfarms",
+      "apiVersion": "2015-04-01",
+      "name": "[variables('hostingPlanName')]",
+      "location": "[variables('location')]",
+      "properties": {
+        "name": "[variables('hostingPlanName')]",
+        "computeMode": "Dynamic",
+        "sku": "Dynamic"
+      }
+    },
+    {
+      "apiVersion": "2015-08-01",
+      "type": "Microsoft.Web/sites",
+      "name": "[variables('functionAppName')]",
+      "location": "[variables('location')]",
+      "kind": "functionapp",
+      "dependsOn": [
+        "[variables('hostingPlanId')]",
+        "[variables('appInsightsId')]",
+        "[variables('storageAccountId')]"
+      ],
+      "properties": {
+        "clientAffinityEnabled": false,
+        "serverFarmId": "[variables('hostingPlanId')]",
+        "siteConfig": {
+          "appSettings": [
+            {
+              "name": "AzureWebJobsDashboard",
+              "value": "[concat('DefaultEndpointsProtocol=https;AccountName=', variables('storageAccountName'), ';AccountKey=', listKeys(variables('storageAccountId'),'2015-05-01-preview').key1)]"
+            },
+            {
+              "name": "AzureWebJobsStorage",
+              "value": "[concat('DefaultEndpointsProtocol=https;AccountName=', variables('storageAccountName'), ';AccountKey=', listKeys(variables('storageAccountId'),'2015-05-01-preview').key1)]"
+            },
+            {
+              "name": "WEBSITE_CONTENTAZUREFILECONNECTIONSTRING",
+              "value": "[concat('DefaultEndpointsProtocol=https;AccountName=', variables('storageAccountName'), ';AccountKey=', listKeys(variables('storageAccountId'),'2015-05-01-preview').key1)]"
+            },
+            {
+              "name": "WEBSITE_CONTENTSHARE",
+              "value": "[variables('functionAppName')]"
+            },
+            {
+              "name": "FUNCTIONS_EXTENSION_VERSION",
+              "value": "~1"
+            },
+            {
+              "name": "APPINSIGHTS_INSTRUMENTATIONKEY",
+              "value": "[reference(variables('appInsightsId'), '2014-04-01').InstrumentationKey]"
+            },
+            {
+              "name": "Project",
+              "value": "AzureApplicationInsightsNodesIssue"
+            }
+          ]
+        }
+      },
+      "resources": [
+        {
+          "apiVersion": "2015-08-01",
+          "name": "web",
+          "type": "sourcecontrols",
+          "dependsOn": [
+            "[resourceId('Microsoft.Web/sites', variables('functionAppName'))]"
+          ],
+          "properties": {
+            "RepoUrl": "[parameters('sourceCodeRepositoryURL')]",
+            "branch": "[parameters('sourceCodeBranch')]",
+            "IsManualIntegration": true
+          }
+        }
+      ]
+    }
+  ]
+}
