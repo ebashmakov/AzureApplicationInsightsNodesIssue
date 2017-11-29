@@ -2,6 +2,7 @@ using System;
 using System.Threading.Tasks;
 
 using Microsoft.ApplicationInsights;
+using Microsoft.ApplicationInsights.Extensibility.Implementation;
 using Microsoft.Azure.WebJobs;
 using Microsoft.Azure.WebJobs.Host;
 
@@ -9,18 +10,26 @@ namespace AzureApplicationInsightsNodesIssue
 {
     public static class Runner
     {
+        private static string GetEnvironmentVariable(string name) =>
+            Environment.GetEnvironmentVariable(name, EnvironmentVariableTarget.Process);
+
         private static readonly TelemetryClient TelemetryClient = new TelemetryClient
         {
-            InstrumentationKey = Environment.GetEnvironmentVariable("APPINSIGHTS_INSTRUMENTATIONKEY", EnvironmentVariableTarget.Process),
+            InstrumentationKey = GetEnvironmentVariable("APPINSIGHTS_INSTRUMENTATIONKEY"),
             Context =
             {
                 Cloud =
                 {
-                    RoleInstance = Environment.GetEnvironmentVariable("WEBSITE_HOSTNAME", EnvironmentVariableTarget.Process),
-                    RoleName = Environment.GetEnvironmentVariable("WEBSITE_SITE_NAME", EnvironmentVariableTarget.Process)
+                    RoleInstance = GetEnvironmentVariable("WEBSITE_HOSTNAME"),
+                    RoleName = GetEnvironmentVariable("WEBSITE_SITE_NAME")
                 }
             }
         };
+
+        static Runner()
+        {
+            TelemetryClient.Context.GetInternalContext().NodeName = TelemetryClient.Context.Cloud.RoleInstance;
+        }
 
         [FunctionName("Send")]
         public static async Task SendAsync([TimerTrigger("*/10 * * * * *")] TimerInfo myTimer, [Queue("messages")] IAsyncCollector<string> queue, TraceWriter log)
