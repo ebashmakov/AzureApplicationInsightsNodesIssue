@@ -2,6 +2,7 @@ using System;
 using System.Threading.Tasks;
 
 using Microsoft.ApplicationInsights;
+using Microsoft.ApplicationInsights.Extensibility;
 using Microsoft.ApplicationInsights.Extensibility.Implementation;
 using Microsoft.Azure.WebJobs;
 using Microsoft.Azure.WebJobs.Host;
@@ -13,9 +14,11 @@ namespace AzureApplicationInsightsNodesIssue
         private static string GetEnvironmentVariable(string name) =>
             Environment.GetEnvironmentVariable(name, EnvironmentVariableTarget.Process);
 
-        private static readonly TelemetryClient TelemetryClient = new TelemetryClient
+        private static readonly TelemetryConfiguration TelemetryConfiguration =
+            new TelemetryConfiguration(GetEnvironmentVariable("APPINSIGHTS_INSTRUMENTATIONKEY"));
+
+        private static readonly TelemetryClient TelemetryClient = new TelemetryClient(TelemetryConfiguration)
         {
-            InstrumentationKey = GetEnvironmentVariable("APPINSIGHTS_INSTRUMENTATIONKEY"),
             Context =
             {
                 Cloud =
